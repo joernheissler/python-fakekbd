@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+
+import time
+import re
+
+from uinput import UInput
+import keys
+
+
+def char2keys(c):
+    """
+    Keymap for German nodeadkeys layout
+    """
+
+    result = []
+
+    if c.isupper() or c in r'''°!"§$%&/()=?`*'>;:_''':
+        result.append(keys.KEY_LEFTSHIFT)
+
+    if c in r'''²³{[]}\@€~|''':
+        result.append(keys.KEY_RIGHTALT)
+
+    kmap = {
+        '^': keys.KEY_GRAVE,
+        '°': keys.KEY_GRAVE,
+        '!': keys.KEY_1,
+        '"': keys.KEY_2,
+        '²': keys.KEY_2,
+        '§': keys.KEY_3,
+        '³': keys.KEY_3,
+        '$': keys.KEY_4,
+        '%': keys.KEY_5,
+        '&': keys.KEY_6,
+        '/': keys.KEY_7,
+        '{': keys.KEY_7,
+        '(': keys.KEY_8,
+        '[': keys.KEY_8,
+        ')': keys.KEY_9,
+        ']': keys.KEY_9,
+        '=': keys.KEY_0,
+        '}': keys.KEY_0,
+        'ß': keys.KEY_MINUS,
+        '?': keys.KEY_MINUS,
+        '\\': keys.KEY_MINUS,
+        '´': keys.KEY_EQUAL,
+        '`': keys.KEY_EQUAL,
+        '@': keys.KEY_Q,
+        '€': keys.KEY_E,
+        'z': keys.KEY_Y,
+        'Z': keys.KEY_Y,
+        'ü': keys.KEY_LEFTBRACE,
+        'Ü': keys.KEY_LEFTBRACE,
+        '+': keys.KEY_RIGHTBRACE,
+        '*': keys.KEY_RIGHTBRACE,
+        '~': keys.KEY_RIGHTBRACE,
+        'ö': keys.KEY_SEMICOLON,
+        'Ö': keys.KEY_SEMICOLON,
+        'ä': keys.KEY_APOSTROPHE,
+        'Ä': keys.KEY_APOSTROPHE,
+        '#': keys.KEY_BACKSLASH,
+        "'": keys.KEY_BACKSLASH,
+        '<': keys.KEY_102ND,
+        '>': keys.KEY_102ND,
+        '|': keys.KEY_102ND,
+        'y': keys.KEY_Z,
+        'Y': keys.KEY_Z,
+        ',': keys.KEY_COMMA,
+        ';': keys.KEY_COMMA,
+        '.': keys.KEY_DOT,
+        ':': keys.KEY_DOT,
+        '-': keys.KEY_SLASH,
+        '_': keys.KEY_SLASH,
+        ' ': keys.KEY_SPACE,
+        '\n': keys.KEY_ENTER,
+    }
+
+    if re.match('[a-xA-X0-9]', c):
+        result.append(getattr(keys, 'KEY_' + c.upper()))
+    elif c in kmap:
+        result.append(kmap[c])
+    else:
+        raise Exception('Unknown char: {}'.format(c))
+
+    return result
+
+
+text = ('# Meine Oma fährt im Hühnerstall Motorrad! #\n' +
+        '# ^1234567890ß´°!"§$%&/()=?`²³{[]}\\' +
+        'qwertzuiopü+QWERTZUIOPÜ*@€~' +
+        'asdfghjklöä#ASDFGHJKLÖÄ\'' +
+        '<yxcvbnm,.->YXCVBNM;:_ #\n')
+
+# Set of keys we're going to press; they need to be activated.
+kset = set()
+
+# List of events
+evs = []
+
+# Fill above structs
+for c in text:
+    ev = char2keys(c)
+    evs.append(ev)
+    kset |= set(ev)
+
+ui = UInput()
+print('UInput API version: {}'.format(ui.version))
+
+# Register each key
+for k in kset:
+    ui.set_keybit(k)
+
+# Create the fake keyboard
+ui.dev_setup(0, 0, 0, 0, 'fake keyboard device', 0)
+ui.create_dev()
+print('Device name: {}'.format(ui.get_sysname(65)))
+
+# Give userspace some time to detect the device
+time.sleep(2)
+
+for ev in evs:
+    # Press keys
+    for k in ev:
+        ui.key_press(k)
+    # Report events
+    ui.syn()
+
+    # Release keys
+    for k in ev:
+        ui.key_release(k)
+    # Report events
+    ui.syn()
+
+    # Some delay so we can watch it.
+    time.sleep(0.15)
+
+# Give userspace time to read the events before we destroy the keyboard
+time.sleep(2)
+
+# Cleanup
+ui.destroy_dev()
